@@ -1,0 +1,73 @@
+role client(C: agent, S: agent, Kc, Ks: public_key, SND, RCV: channel(dy))
+played_by C
+def=
+	local
+		State: nat,
+		UID, PW, K: text
+	init
+		State := 0
+	transition
+		1. State = 0 /\ RCV(start) =|>  
+			State' := 1 
+			/\ UID' := new() 
+			/\ PW' := new() 
+			/\ SND({C.S.UID'.PW'}_Ks)
+			
+		2. State = 1 /\ RCV({C.S.UID.PW.K'}_Kc) =|> 
+			State' := 2 
+			/\ request(C, S, auth_1, K')
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role server(S: agent, C: agent, Ks, Kc: public_key, SND, RCV: channel(dy))
+played_by S
+def=
+	local
+		State: nat, 
+		UID, PW, K: text
+	init
+		State := 0
+	transition
+		1. State = 0 /\ RCV({C.S.UID'.PW'}_Ks) =|> 
+			State' := 1 
+			/\ K' := new()
+			/\ SND({C.S.UID'.PW.K'}_Kc)
+			/\ secret(K', sec_1, {C, S}) 
+			/\ witness(S, C, auth_1, K')
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+role session(C: agent, S: agent, Ks, Kc: public_key)
+def=
+	local
+		SND2, RCV2, SND1, RCV1: channel(dy)
+	composition
+		server(S, C, Ks, Kc, SND2, RCV2) 
+		/\ client(C, S, Kc, Ks, SND1, RCV1)
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+role environment()
+def=
+	const
+		ka, kb: public_key,
+		alice, bob: agent,
+		auth_1, sec_1: protocol_id
+
+	intruder_knowledge = {alice,bob,ka, kb}
+	composition
+		session(alice, bob, kb, ka) /\ session(alice, bob, kb, ka)
+end role
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+goal
+	secrecy_of sec_1
+    authentication_on auth_1
+end goal
+
+environment()
+
