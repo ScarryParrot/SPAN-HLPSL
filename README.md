@@ -8,3 +8,4 @@ login-
 reg-
 ![image](https://github.com/ScarryParrot/SPAN-HLPSL/assets/110553838/3e28c498-8d99-4082-ad0e-c722a7bc07c5)
 
+-Ayush Prajapati (updated on July 2024)
