@@ -1,0 +1,77 @@
+role role_Client(C: agent, S: agent, UID: text, PW: text, OTPc: nat, Hash: hash_func, PKS: public_key, PKC: public_key, SND, RCV: channel(dy))
+played_by C
+def=
+    local
+        State: nat,
+        TKi, SK, Na, FTKi: text
+    init
+        State := 0 /\
+        OTPc := 1234
+    transition
+        1. State=0 /\ RCV(start) =|>
+            State' := 1 /\
+            SND({C.S.Hash(UID.PW)}_PKS)
+        2. State=1 /\ RCV({S.C.Hash({TKi'}_inv(PKS))}_PKC) =|>
+            State' := 2 /\
+            SND({C.S.Hash({TKi.OTPc}_inv(PKC))}_PKS) /\ 
+            secret(OTPc, sec_1, {C,S}) 
+        3. State=2 /\ RCV({S.C.Hash({SK'.FTKi'}_inv(PKS))}_PKC) =|>
+            State' := 3
+end role
+
+role role_Server(S: agent, C: agent, PKS: public_key, PKC: public_key, Hash: hash_func, SK: text, SND, RCV: channel(dy))
+played_by S
+def=
+    local
+        State: nat,
+        UID, PW, TKi,Na,FTKi : text,
+        OTPs, OTPc: nat
+    init
+        State := 0 
+    transition
+        1. State=0 /\ RCV({C.S.Hash(UID'.PW')}_PKS) /\ UID = UID' /\ PW = PW' =|>
+            State' := 1 /\
+            TKi' := new() /\
+            Na' := new() /\
+            SND({S.C.Hash({TKi}_inv(PKS))}_PKC) 
+        2. State=1 /\ RCV({C.S.Hash({TKi.OTPc'}_inv(PKC))}_PKS) =|>
+            State' := 2 /\
+            OTPc' := OTPc /\
+            OTPs' := 1234
+        3. State=2 /\ OTPc = OTPs =|>
+            State' := 3 /\ FTKi' := new() /\
+            SND({S.C.Hash({SK.FTKi}_inv(PKS))}_PKC) /\
+            secret(SK, sec_2, {S, C}) 
+end role
+
+role session(C: agent, S: agent, UID: text, PW: text, PKS: public_key, Hash: hash_func, PKC: public_key, SK: text, OTPc: nat)
+def=
+    local
+        SND1, RCV1: channel(dy),
+        SND2, RCV2: channel(dy)
+    composition
+        role_Client(C, S, UID, PW, OTPc, Hash, PKS, PKC, SND1, RCV1) /\
+        role_Server(S, C, PKS, PKC, Hash, SK, SND2, RCV2)
+end role
+
+role environment()
+def=
+    const
+        pkS: public_key, pkC: public_key,
+        client, server: agent,
+        sec_1, sec_2,auth_1: protocol_id,
+        sk, uid, pw: text,
+        otpc: nat,
+        h: hash_func
+    intruder_knowledge = {client, server, pkC}
+    composition
+        session(client, server, uid, pw, pkS, h, pkC, sk, otpc)
+end role
+
+goal
+    secrecy_of sec_1
+    secrecy_of sec_2 
+    authentication_on auth_1
+end goal
+
+environment()
